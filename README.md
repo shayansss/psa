@@ -12,6 +12,6 @@ Pre-stressing in multiphasic models of articular cartilage causes its soft struc
 You should install all the dependencies (tested successfully on Windows 10) and link them. This is described (using another similar version) in [this tutorial](http://dx.doi.org/10.13140/RG.2.2.33539.32800). Then, download this repository to your system. As the address of the root directory of the local repository in your system may not be the same as the one set in the code, you should change it to your local address by correcting the values passed to: 1) the `os.chdir` function inside Python file; 2) the `FilLoc` variable in the Fortran file (in this case, if the length of the new address is changed, you should also correct the length assigned to `LenFil` defined after `CHARACTER FilLoc`).
 
 ## How to run
-Run the Python scripts inside Abaqus. It first initializes state variables, in the values in shraded text files, and then implementes pre-stressing. Finally, it generates the convergence plot.
+Run the Python scripts inside Abaqus. It first initializes the state variables for each point, and then saved by data shredded to accelerate accessing them in Fortran. Finally, it implements the pre-stressing algorithm, for which a convergence plot is generated.
 
 Enjoy!
