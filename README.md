@@ -1,5 +1,5 @@
-# Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage
-This repository contains the core data of our under review manuscript, entitled "[Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage](https://shayansss.github.io/files/2022_06.pdf)".
+# Large-scale pre-stress in multi-phasic cartilage
+This repository contains the core data of our under-review manuscript, entitled "[Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage](https://shayansss.github.io/files/2022_06.pdf)".
 
  <!--- Surrogates are typically used to speed up numerical simulations, based on the generated numerical results gathered inside some datasets by an expensive numerical solver to then train a machine learning model that can be used instead of the slow numerical model. Our hybrid machine learning (HML) algorithm utilized a similar method; However, it firstly has a reduced-order (but fast enough) numerical submodel that can give a rough estimate of the results, and secondly a machine learning submodel within this hybrid implementation improves the accuracy of the low-fidelity results to the level of the high-fidelity results. The main benefits of it, which is potentially applicable in many of the soft tissues' finite element simulations, are its non-destructive and efficient implementation (since it does not complicate learning and can work with limited data of multi-physics problems). Here, we performed some empirical tests, as elaborated in the paper.
 
