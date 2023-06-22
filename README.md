@@ -1,19 +1,19 @@
 ### This repository is currently under development and may undergo frequent changes.  ###
 
-# Large-scale pre-stress in multi-phasic cartilage
-This repository contains the core data of our under-review manuscript, entitled "Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage".
+# Large-Scale Pre-Stress in Multi-Phasic Cartilage
+This repository contains the core data from our submitted manuscript, titled "Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage".
 
-Pre-stressing in multiphasic models of articular cartilage causes its soft structure to change, consequently changing the material (due to the fluid diffusion inside the solid structure). Since the initial state of cartilage before pre-stressing (where finite element analysis starts) is unknown, a unified optimizer is developed, which proved to be suitable in large-scale pre-stressing analysis. The importance of such a model is that it is not very time-consuming and allows us to include the important osmotic pressure phase (that causes pre-stressing) next to the other phases.
+Pre-stressing in multi-phasic models of articular cartilage affects its soft structure, subsequently altering the material due to fluid diffusion within the solid structure. Given that the initial state of the cartilage prior to the pre-stressed state (where finite element analysis typically begins) is unknown, we have developed a unified optimizer to find that state. This optimizer has proven suitable for large-scale pre-stressing analysis. The value of such an algorithm lies in its efficiency; it is not overly time-consuming and allows us to include the crucial osmotic pressure phase (which causes pre-stressing) alongside the other phases at a large scale.
 
-## Dependency
-- Visual Studio = 2019 (at least the Community edition)
-- Intel® Parallel Studio XE = 2020 with Update 4
-- Abaqus/CAE = 2021 (full version)
+## Dependencies
+- Visual Studio 2019 or later (Community edition or higher)
+- Intel® Parallel Studio XE 2020 (Update 4 or later)
+- Abaqus/CAE 2021 (full version)
 
 ## Installation
-You should install all the dependencies (tested successfully on Windows 10) and link them. This is described (using another similar version) in [this tutorial](http://dx.doi.org/10.13140/RG.2.2.33539.32800). Then, download this repository to your system. As the address of the root directory of the local repository in your system may not be the same as the one set in the code, you should change it to your local address by correcting the values passed to: 1) the `os.chdir` function inside Python file; 2) the `FilLoc` variable in the Fortran file (in this case, if the length of the new address is changed, you should also correct the length assigned to `LenFil` defined after `CHARACTER FilLoc`).
+Firstly, you need to install all the dependencies, which have been successfully tested on Windows 10, and then link them. The process is described in [this tutorial](http://dx.doi.org/10.13140/RG.2.2.33539.32800), which uses a similar version. Afterward, download this repository into your system. Given that the address of the root directory of the local repository on your system may differ from the one set in the code, you will need to change it to your local address. You can do this by modifying the values passed to the `os.chdir` function in the Python file and the `FilLoc` variable in the Fortran file. In the latter case, if the length of the new address is changed, you will also need to correct the length defined after `CHARACTER FilLoc` and assigned to `LenFil`.
 
-## How to run
-Run the Python scripts inside Abaqus. It first initializes the state variables for each point, and then saved by data shredded to accelerate accessing them in Fortran. Finally, it implements the pre-stressing algorithm, for which a convergence plot is generated.
+## How to Run
+Execute the Python scripts within Abaqus. This process first initializes the state variables for each point, which are then saved by data shredding to speed up access in Fortran. Finally, it implements the pre-stressing algorithm and generates a convergence plot.
 
 Enjoy!
