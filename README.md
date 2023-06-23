@@ -1,5 +1,3 @@
-### This repository is currently under development and may undergo frequent changes.  ###
-
 # Large-Scale Pre-Stress in Multi-Phasic Cartilage
 This repository contains the core data from our submitted manuscript, titled "Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage".
 
