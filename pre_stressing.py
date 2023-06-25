@@ -418,7 +418,7 @@ class nonlipls_tools():
             sdvList=['SDV%s'%(i) for i in (range(1,4) + range(16,43))],
             zeta=1.0, 
             breakPoint=0, 
-            errorLimit=1e-3,
+            errorLimit=1e-4,
             maxiteration=50,
             eta=1.5
             ):
@@ -556,15 +556,6 @@ class nonlipls_tools():
             with open(os.path.join(self.txtFolderName, 'DATA.txt'), "w") as f:
                 f.write('1\n')
         
-        def _error_approximation(newValues, zeta):
-            return 
-        
-        def _nodal_error(initialNodalCoords, newNodalCoords, zeta):
-            return 
-                   
-                   
-                   
-        
         def _new_SDV_in_fortran(newSdvData):
             IntegrationPointArray = np.unique(newSdvData[0][2::3]) # [1.0, 2.0, 3.0, 4.0, ...]
             IntegrationCount = IntegrationPointArray[-1].max() # number of all integration points
@@ -652,7 +643,7 @@ class nonlipls_tools():
             
             print '\n** #STEP: %s | ERROR: %s | ZETA: %s **\n' % (iterationNumber, newError, zeta)
             
-            self.optimizerStatus['step'].append(iterationNumber)
+            self.optimizerStatus['step'].append(iterationNumber+1)
             self.optimizerStatus['error'].append(newError)
             self.optimizerStatus['zeta'].append(zeta)
             
@@ -719,10 +710,17 @@ elapsed_time = time.time() - start_time
 print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%3600)//60)
 
 
+# img dir
+os.mkdir('img')
+
+
+
+
 # Convergence plot:
 SMALL_SIZE = 20//1.4
 MEDIUM_SIZE = 24//1.4
 BIGGER_SIZE = 28//1.4
+
 plt.rc('font', size=SMALL_SIZE)         
 plt.rc('axes', titlesize=MEDIUM_SIZE)    
 plt.rc('axes', labelsize=MEDIUM_SIZE)   
@@ -737,13 +735,19 @@ y2 = nonliplsTools.optimizerStatus['zeta']
 
 fig, ax1 = plt.subplots()
 
-ax1.plot(x, y1)
+ax1.plot(x, y1, color='blue', linestyle='-', linewidth=2)
+ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
+# ax1.grid(True)
 ax1.tick_params(axis='y')
-
 ax1.set_xlabel('Step')
 ax1.set_ylabel('Error')
-ax1.set_yscale('log')
+# ax1.set_yscale('log')
+
+ax1.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.2f}'.format(y))) 
+ax1.tick_params(axis='y')
 fig.tight_layout()
+plt.savefig('img/convergence_plot.png', dpi=300)
+
 plt.show()
 
 
@@ -832,15 +836,6 @@ def tibia_b(name):
         viewOffsetX=1.36828, viewOffsetY=-1.61421)
     print_png(name+'_tibia_b')
 
-# def tibia_t(name):
-    # replace_leaf_fn(leaf_tibia)
-    # viewportObj.view.setValues(nearPlane=137.897, 
-        # farPlane=199.553, width=108.655, height=62.2707, cameraPosition=(
-        # 72.7386, 219.069, 25.1232), cameraUpVector=(0.981238, -0.192104, 
-        # 0.0164036), cameraTarget=(96.8568, 52.6318, 44.775), 
-        # viewOffsetX=1.37465, viewOffsetY=-1.62172)
-    # print_png(name+'_tibia_t')
-
 
 def femur_b(name):
     replace_leaf_fn(leaf_femur)
@@ -853,15 +848,6 @@ def femur_b(name):
     print_png(name+'_femur_b')
 
 
-# def femur_t(name):
-    # replace_leaf_fn(leaf_femur)
-    # viewportObj.view.setValues(nearPlane=111.634, 
-        # farPlane=197.23, width=119.855, height=68.6894, cameraPosition=(
-        # 71.5149, -80.5323, 40.7028), cameraUpVector=(0.944316, 0.290544, 
-        # 0.154442), cameraTarget=(77.6068, 88.53, 47.7491), viewOffsetX=1.21754, 
-        # viewOffsetY=-0.116666)
-    # print_png(name+'_femur_t')
-
 def full_cartilage(name):
     replace_leaf_fn(leaf=leaf_cartilage)
     viewportObj.view.setValues(nearPlane=63.5544, 
@@ -873,9 +859,7 @@ def full_cartilage(name):
     viewportObj.view.fitView()
     print_png(name+'_full_cartilage')
 
-
-
-
+viewportObj.setValues(displayedObject=odbObj)
 viewportObj.odbDisplay.display.setValues(plotState=(CONTOURS_ON_DEF, ))
 viewportObj.viewportAnnotationOptions.setValues(
     legendBox=OFF, triad=OFF, legendNumberFormat=FIXED, title=OFF, state=OFF
@@ -886,7 +870,7 @@ frame1 = session.scratchOdbs[odbname].steps['Session Step'].frames[0]
 viewportObj.odbDisplay.setFrame(frame=frame1)
 
 viewportObj.odbDisplay.contourOptions.setValues(
-    numIntervals=6, maxAutoCompute=OFF, maxValue=0.14, minAutoCompute=OFF, minValue=-0.0
+    numIntervals=6, maxAutoCompute=OFF, maxValue=0.12, minAutoCompute=OFF, minValue=0.0
     )
 for label in ['Mises Stress (MPa)', 'Fibrillar Mises Stress (MPa)']:
     viewportObj.odbDisplay.setPrimaryVariable(variableLabel=label, outputPosition=INTEGRATION_POINT)
