@@ -22,7 +22,7 @@ C
       DOUBLE PRECISION DEPTH,RPHI,G(10),RTHETA
       REAL RDEG
       INTEGER i, k0, k1, k2, LenFil
-      CHARACTER FilLoc*31, sdvNum*5, NoelTxt*10
+      CHARACTER FilLoc*42, sdvNum*5, NoelTxt*10
 C
       PARAMETER (ZERO=0.D0,ONE=1.D0,TWO=2.D0,TEN=10.D0,FOUR=4.D0,
      1 CONS1=5.235987755983D0,PI=3.14159265359D0,FFD=0.57735026919D0)
@@ -48,8 +48,8 @@ C     91 - 93 --->  INITIAL COORDS
 C     94 - 96 --->  UPDATED COORDS
 C
 C
-      FilLoc = 'C:\temp\DA\txt\DATA.txt'
-      LenFil = 23  ! length of FilLoc
+      FilLoc = 'C:\temp\pre_stress_3d\txt\DATA.txt'
+      LenFil = LEN_TRIM(FILLOC)  ! length of FilLoc
 C
       OPEN(UNIT=29,FILE=FilLoc(:LenFil),STATUS='OLD')
        READ(29,*,end=10) k0 ! it is an identifer (pre-stressing, initial parameter defenition, ...)
@@ -139,6 +139,53 @@ C
 C - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 C     
 C - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+C
+C
+C
+C
+C      SUBROUTINE FRIC(LM,TAU,DDTDDG,DDTDDP,DSLIP,SED,SFD,
+C     1 DDTDDT,PNEWDT,STATEV,DGAM,TAULM,PRESS,DPRESS,DDPDDH,SLIP,
+C     2 KSTEP,KINC,TIME,DTIME,NOEL,CINAME,SECNAME,MAINNAME,NPT,NODE,
+C     3 NPATCH,COORDS,RCOORD,DROT,TEMP,PREDEF,NFDIR,MCRD,NPRED,
+C     4 NSTATV,CHRLNGTH,PROPS,NPROPS)
+CC
+C      INCLUDE 'ABA_PARAM.INC'
+CC
+C      CHARACTER*80 CINAME,SECNAME,MAINNAME
+CC
+C      DIMENSION TAU(NFDIR),DDTDDG(NFDIR,NFDIR),DDTDDP(NFDIR),
+C     1 DSLIP(NFDIR),DDTDDT(NFDIR,2),STATEV(*),DGAM(NFDIR),
+C     2 TAULM(NFDIR),SLIP(NFDIR),TIME(2),COORDS(MCRD),
+C     3 RCOORD(MCRD),DROT(2,2),TEMP(2),PREDEF(2,*),PROPS(NPROPS)
+C
+C
+C      LM = 2 ! ASSUMING THAT THERE IS NOT FRICTIONAL CONTACT.
+C      write(6,*) NPT, NODE, NOEL, KSTEP, KINC, '000000000'
+C
+C      RETURN
+C      END
+C
+C
+C
+C
+C
+C
+C       SUBROUTINE FLOW(H,SINK,U,KSTEP,KINC,TIME,NOEL,NPT,COORDS,
+C      1 JLTYP,SNAME)
+C
+C       INCLUDE 'ABA_PARAM.INC'
+C       DIMENSION TIME(2), COORDS(3)
+C       CHARACTER*80 SNAME
+C       H=1
+C       SINK=0
+C       IF (COORDS(1).LE.12.5) THEN
+C        H=0
+C       ENDIF
+C       RETURN
+C       END
+C
+C
+C
 C
 C
       SUBROUTINE UMAT(STRESS,STATEV,DDSDDE,SSE,SPD,SCD,

@@ -9,6 +9,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from functools import partial
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 
 def job_submit(
@@ -181,7 +182,7 @@ class nonlipls_tools():
         sectionName='CAR',
         stepName='EQ',
         txtFolderName='txt',
-        subroutineFile='NONLIPLS.for',
+        subroutineFile='subroutines.for',
         numSdv=200,
         ):
         
@@ -417,10 +418,11 @@ class nonlipls_tools():
             sdvList=['SDV%s'%(i) for i in (range(1,4) + range(16,43))],
             zeta=1.0, 
             breakPoint=0, 
-            errorLimit=1e-4,
+            errorLimit=1e-3,
             maxiteration=50,
+            eta=1.5
             ):
-        
+        zeta = float(zeta) # avoiding problem with integer division
         modelWithoutOptimizaionObj = mdb.models[self.modelNameWithoutOptimizaion]
         self._set_umat_key(modelWithoutOptimizaionObj, 1.0)
         self._focus_on_first_step(modelWithoutOptimizaionObj)
@@ -555,13 +557,13 @@ class nonlipls_tools():
                 f.write('1\n')
         
         def _error_approximation(newValues, zeta):
-            return np.linalg.norm(np.array([newValues[i] for i in xrange(len(newValues)) if i % 4 != 0])) / zeta
+            return 
         
         def _nodal_error(initialNodalCoords, newNodalCoords, zeta):
-            return [(newNodalCoords[i]-initialNodalCoords[i])*zeta
-                    if i % 4 != 0
-                    else newNodalCoords[i] # just the label
-                    for i in xrange(len(newNodalCoords))]
+            return 
+                   
+                   
+                   
         
         def _new_SDV_in_fortran(newSdvData):
             IntegrationPointArray = np.unique(newSdvData[0][2::3]) # [1.0, 2.0, 3.0, 4.0, ...]
@@ -588,15 +590,33 @@ class nonlipls_tools():
         initialNodalCoords = _extract_coords_values(odbObjWithoutOptimization, 0)
         copyfile(self.odbNameWithoutOptimizaion, self.odbName)
         
-        self.optimizerStatus = {'step': [], 'error': [], 'zeta': []}
-        zeta = float(zeta) # avoiding problem with integer division
+        def _calculate_r_u(zeta):
+            odb = open_odb(self.odbName)
+            newNodalCoords = _extract_coords_values(odb, -1)
+            close_odb(self.odbName)
+            
+            displacementFromInitial = [(newNodalCoords[i]-initialNodalCoords[i])*zeta
+                                       if i % 4 != 0
+                                       else newNodalCoords[i] # just the label
+                                       for i in xrange(len(newNodalCoords))]
+            
+            newError = np.linalg.norm(np.array(
+                [displacementFromInitial[i] for i in xrange(len(displacementFromInitial)) if i % 4 != 0]
+                )) / zeta
+            
+            return newError, displacementFromInitial
+            
+        newError, displacementFromInitial = _calculate_r_u(zeta)
+        
+        self.optimizerStatus = {'step': [1], 'error': [newError], 'zeta': [zeta]}
+        
         failed=False
         iterationNumber = 0
-        breakPoint = 0
+        # breakPoint = 0
         
         newSdvDataBackup = _integration_points_values(odbObjWithoutOptimization, sdvList, 0)
         close_odb(self.odbNameWithoutOptimizaion)
-        previousError = np.inf # this number will be corrected in the next iterations
+        previousError = newError
         
         while True:
             
@@ -606,14 +626,29 @@ class nonlipls_tools():
             else:
                 iterationNumber += 1
             
-            if (zeta < 0.5) and (iterationNumber - breakPoint > 5):
-                zeta = zeta*2
+            # if (zeta < 0.5) and (iterationNumber - breakPoint > 5):
+                # zeta = zeta*2
             
-            odb = open_odb(self.odbName)
-            newNodalCoords = _extract_coords_values(odb, -1)
-            close_odb(self.odbName)
-            displacementFromInitial = _nodal_error(initialNodalCoords, newNodalCoords, zeta)
-            newError = _error_approximation(displacementFromInitial, zeta)
+            copy_model(self.modelName + '-Backup', self.modelName)
+            _edit_node_by_offset(displacementFromInitial, self.modelName)
+            copy_model(self.modelNameInverse + '-Backup', self.modelNameInverse)
+            _edit_node_by_offset(displacementFromInitial, self.modelNameInverse)
+            _inverse_run(displacementFromInitial)
+            odbInverse = open_odb(self.odbNameInverse)
+            newSdvData = _integration_points_values(odbInverse, sdvList, -1)
+            close_odb(self.odbNameInverse)
+            _new_SDV_in_fortran(newSdvData)
+            
+            
+            if self.job_submit(self.jobName) != 'ABORTED':
+                newError, displacementFromInitial = _calculate_r_u(zeta)
+                if previousError < newError:
+                    successfulStep = False
+                else:
+                    successfulStep = True
+                
+            else:
+                successfulStep = False
             
             print '\n** #STEP: %s | ERROR: %s | ZETA: %s **\n' % (iterationNumber, newError, zeta)
             
@@ -624,48 +659,27 @@ class nonlipls_tools():
             if errorLimit > newError:
                 failed = False
                 break
-                
-            elif previousError < newError:
-                successfulStep = False
-                
-            else:
-                copy_model(self.modelName + '-Backup', self.modelName)
-                _edit_node_by_offset(displacementFromInitial, self.modelName)
-                copy_model(self.modelNameInverse + '-Backup', self.modelNameInverse)
-                _edit_node_by_offset(displacementFromInitial, self.modelNameInverse)
-                _inverse_run(displacementFromInitial)
-                odbInverse = open_odb(self.odbNameInverse)
-                newSdvData = _integration_points_values(odbInverse, sdvList, -1)
-                close_odb(self.odbNameInverse)
-                _new_SDV_in_fortran(newSdvData)
-                
-                if self.job_submit(self.jobName) != 'ABORTED':
-                    successfulStep = True # if conditions are not combined by "and", since
-                                          # job_submit() might be unnecessarily time-consuming
-                else:
-                    successfulStep = False
-                    # if iterationNumber > 20:
-                    #     raise Exception('The model is too unstable even'
-                    #                     'after several 20 steps of the optimizer.')
             
             if successfulStep == True:
                 newSdvDataBackup = copy.deepcopy(newSdvData)
                 previousError = newError
-                
+            
             else:
                 _new_SDV_in_fortran(newSdvDataBackup)
-                zeta = zeta/4.0
+                zeta = zeta/eta
                 
                 if zeta < 0.0001:
-                    # _finish_optimization(failed=True) # This stops the run() function
                     failed = True
                     break
                 
-                if breakPoint != iterationNumber:
-                    copy_model(self.modelName, self.modelName + '-Backup')
-                    copy_model(self.modelNameInverse, self.modelNameInverse + '-Backup')
+                # if breakPoint != iterationNumber:
+                    # copy_model(self.modelName, self.modelName + '-Backup')
+                    # copy_model(self.modelNameInverse, self.modelNameInverse + '-Backup')
                 
-                breakPoint = iterationNumber
+                copy_model(self.modelName, self.modelName + '-Backup')
+                copy_model(self.modelNameInverse, self.modelNameInverse + '-Backup')
+                
+                # breakPoint = iterationNumber
         
         # finish_optimization
         modelsObj = mdb.models
@@ -682,148 +696,114 @@ class nonlipls_tools():
                 del modelsObj[modelName].rootAssembly.sets[tempSetName]
         
         if failed == True:
-            print 'PRE_STRESSING IS FAILD! \n'
+            print 'PRE_STRESSING HAS NOT BEEN FULLY CONVERGED! \n'
             return 'ABORTED'
         else:
-            print 'PRE_STRESSING IS COMPLETED! \n'
+            print 'PRE_STRESSING HAS BEEN COMPLETED! \n'
             return 'COMPLETED'
-
-
-class sdv_tools(object):
-    
-    def __init__(
-        self,
-        odb,
-        instance,
-        nodeSetKey,
-        excludingSteps=set(),
-        position=NODAL,
-        jobStatus='COMPLETED',
-        ):
-        assert type(excludingSteps) == set, Exception('Error: excludingSteps argument contains set!')
-        stepsObj = odb.steps
-        stepskeys = stepsObj.keys()
-        
-        # some of the excludingSteps might not exists which are eleminated
-        excludingSteps = excludingSteps.intersection(set(stepskeys))
-        baseTime = max([0]+[stepsObj[k].totalTime+stepsObj[k].timePeriod for k in excludingSteps])
-        
-        frames, times, relativeTimesDict = [], [], {}
-        
-        for step in stepsObj.values():
-            stepName = step.name
-            
-            if stepName not in excludingSteps:
-                initialTime = step.totalTime - baseTime
-                framesObj = step.frames
-                
-                if initialTime != 0.0:
-                    framesObj = framesObj[1:]
-                
-                stepFrames = [frame for frame in framesObj]
-                relativeTimes = np.array([frame.frameValue for frame in stepFrames])
-                times.append(initialTime + relativeTimes)
-                frames.extend(stepFrames)
-                
-                if len(relativeTimes) > 1:
-                    relativeTimesDict[stepName] = np.array(relativeTimes).reshape(-1, 1)
-        
-        times = np.concatenate(times, axis=0)
-        
-        # if job was aborted, the last frame was not converged and should be deleted
-        if jobStatus == 'ABORTED':
-            lastStepName = stepskeys[-1]
-            frames = frames[:-1]
-            times = times[:-1]
-            
-            if lastStepName in relativeTimesDict:
-                relativeTimesDict[lastStepName] = relativeTimesDict[lastStepName][:-1]
-        
-        self.frames = frames
-        self.times = times
-        self.relativeTimes = relativeTimesDict
-        self.region = instance.nodeSets[nodeSetKey]
-        self.instance = instance
-        self.position = position
-        self.odb = odb
-    
-    def get_values(self, field, frame):
-        return frame.fieldOutputs[field].getSubset(region=self.region, position=self.position).values
-    
-    def extract_data(self, field, component='data', frame_first=False):
-        
-        data = np.array([
-            [getattr(value, component) for value in self.get_values(field, frame)] for frame in self.frames
-        ])
-        
-        if data.ndim == 2:
-            data = np.expand_dims(data, axis = -1)
-        
-        if frame_first==False:
-            data = data.transpose([1, 0, 2])
-        
-        return data
-    
-    def get_sample_value_obj(self, field, frameNum = -1):
-        return self.get_values(field, self.frames[frameNum])
-    
-    def make_tensor_from_sdvs(self, sdvNumsList, name):
-        
-        numComponents = len(sdvNumsList)
-        
-        if numComponents == 6:
-            validInvariants = (MISES, TRESCA, PRESS, INV3, MAX_PRINCIPAL, MID_PRINCIPAL, MIN_PRINCIPAL,)
-            type=TENSOR_3D_FULL
-        elif numComponents in [3 , 2]:
-            validInvariants = (MAGNITUDE, )
-            type=VECTOR
-        else:
-            raise Exception('The "make_tensor_from_sdvs" function does not support this tensor type')
-        
-        data = [self.extract_data('SDV'+str(sdvNum), frame_first=True) for sdvNum in sdvNumsList]
-        data = np.concatenate(data, axis = -1)
-        nodeLabels = [value.nodeLabel for value in self.get_sample_value_obj('SDV'+str(sdvNumsList[0]))]
-        
-        # frame.frameId might not be sequential, so avoid it, instead I use:
-        num = 0
-        
-        for frame in self.frames:
-            custom_field = frame.FieldOutput(
-                name=name, description=name, type=type, validInvariants = validInvariants
-                )
-            custom_field.addData(
-                position=NODAL, instance=self.instance, labels=nodeLabels, data=data[num]
-                )
-            num += 1
 
 
 
 os.chdir('C:\\Temp\\pre_stress_3d')
 openMdb(pathName = 'open_knee.cae')
 
-nonliplsTools = nonlipls_tools('knee', 'knee')
 
+start_time = time.time()
+
+# run PSA
+nonliplsTools = nonlipls_tools('knee', 'knee')
 nonliplsTools.initialize_params('LAT_CARTILAGE', 'MED_CARTILAGE', 'FEMUR_CARTILAGE')
 nonliplsTools.run_prestress_optimizer('ARTICULAR_CARTILAGE')
 
+elapsed_time = time.time() - start_time
+print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%3600)//60)
 
-odbObj = open_odb('knee-withEQ.odb')
-instanceObj = odbObj.rootAssembly.instances['PART-1-1']
 
-sdvTool = sdv_tools(
-    odbObj,
-    instanceObj,
-    jobStatus='COMPLETED',
-    nodeSetKey='ARTICULAR_CARTILAGE_NODES',
-    position=AVERAGED_AT_NODES,
-    )
-sdvTool.make_tensor_from_sdvs(range(70,76), 'FIB')
+# Convergence plot:
+SMALL_SIZE = 20//1.4
+MEDIUM_SIZE = 24//1.4
+BIGGER_SIZE = 28//1.4
+plt.rc('font', size=SMALL_SIZE)         
+plt.rc('axes', titlesize=MEDIUM_SIZE)    
+plt.rc('axes', labelsize=MEDIUM_SIZE)   
+plt.rc('xtick', labelsize=SMALL_SIZE)   
+plt.rc('ytick', labelsize=SMALL_SIZE)   
+plt.rc('legend', fontsize=SMALL_SIZE)   
+plt.rc('figure', titlesize=BIGGER_SIZE)
+
+x = nonliplsTools.optimizerStatus['step']
+y1 = nonliplsTools.optimizerStatus['error']
+y2 = nonliplsTools.optimizerStatus['zeta']
+
+fig, ax1 = plt.subplots()
+
+ax1.plot(x, y1)
+ax1.tick_params(axis='y')
+
+ax1.set_xlabel('Step')
+ax1.set_ylabel('Error')
+ax1.set_yscale('log')
+fig.tight_layout()
+plt.show()
+
+
+
+# mdb.models['knee-withEQ'].steps['LOAD'].suppress()
+# session.viewports['Viewport: 1'].assemblyDisplay.setValues(step='Initial')
+# session.viewports['Viewport: 1'].assemblyDisplay.setValues(step='EQ')
+# mdb.models['knee-withEQ'].fieldOutputRequests['EQ'].setValues(
+    # frequency=LAST_INCREMENT, position=INTEGRATION_POINTS)
+
+# nonliplsTools.job_submit('knee-withEQ')
+
+
+# creating fibrillar stress
 
 
 
 viewportObj = session.viewports['Viewport: 1']
 session.printOptions.setValues(reduceColors=False)
 session.pngOptions.setValues(imageSize=(4000, 2289))
+
+
+odbObj = open_odb('knee-withEQ.odb')
+fieldOutputsObj = odbObj.steps['EQ'].frames[-1].fieldOutputs
+
+s1f1_SDV70 = fieldOutputsObj['SDV70']
+s1f1_SDV71 = fieldOutputsObj['SDV71']
+s1f1_SDV72 = fieldOutputsObj['SDV72']
+s1f1_SDV73 = fieldOutputsObj['SDV73']
+s1f1_SDV74 = fieldOutputsObj['SDV74']
+s1f1_SDV75 = fieldOutputsObj['SDV75']
+
+scratchOdb = session.ScratchOdb(odb=odbObj)
+sessionStep = scratchOdb.Step(name='Session Step', 
+    description='Step for Viewer non-persistent fields', 
+    domain=TIME, timePeriod=1.0)
+sessionFrame = sessionStep.Frame(frameId=0, frameValue=0.0, description='Session Frame')
+
+sessionFrameObj = session.scratchOdbs['knee-withEQ.odb'].steps['Session Step'].frames[0]
+sessionFrameObj.FieldOutput(
+    name='Fibrillar Mises Stress (MPa)', 
+    description='',
+    field=sqrt(0.5*((s1f1_SDV70-s1f1_SDV71)*(s1f1_SDV70-s1f1_SDV71)+(
+        s1f1_SDV71-s1f1_SDV72)*(s1f1_SDV71-s1f1_SDV72)+(
+        s1f1_SDV70-s1f1_SDV72)*(s1f1_SDV70-s1f1_SDV72)+6*(
+        s1f1_SDV73*s1f1_SDV73+s1f1_SDV74*s1f1_SDV74+s1f1_SDV75*s1f1_SDV75)))
+    )
+
+sessionFrameObj.FieldOutput(
+    name='Mises Stress (MPa)', 
+    description='',
+    field=fieldOutputsObj['S'].getScalarField(invariant=MISES)
+    )
+
+sessionFrameObj.FieldOutput(
+    name='Deformation magnitude (mm)', 
+    description='',
+    field=fieldOutputsObj['U'].getScalarField(invariant=MAGNITUDE)
+    )
+
 
 def print_png(name):
     session.printToFile(
@@ -839,9 +819,12 @@ leaf_femur = dgo.LeafFromOdbElementSections(elementSections=(
     ))
 leaf_cartilage = dgo.LeafFromOdbElementMaterials(elementMaterials=('CAR_UMAT', ))
 
+replace_leaf_fn = lambda leaf: viewportObj.odbDisplay.displayGroup.replace(leaf=leaf)
 
+# drawing contours
 def tibia_b(name):
-    viewportObj.odbDisplay.displayGroup.replace(leaf=leaf_tibia)
+    replace_leaf_fn(leaf_tibia)
+    viewportObj.view.setProjection(projection=PERSPECTIVE)
     viewportObj.view.setValues(nearPlane=137.258, 
         farPlane=200.913, width=108.151, height=61.9818, cameraPosition=(
         104.938, -114.507, 65.1538), cameraUpVector=(0.922775, 0.376379, 
@@ -849,18 +832,19 @@ def tibia_b(name):
         viewOffsetX=1.36828, viewOffsetY=-1.61421)
     print_png(name+'_tibia_b')
 
-def tibia_t(name):
-    viewportObj.odbDisplay.displayGroup.replace(leaf=leaf_tibia)
-    viewportObj.view.setValues(nearPlane=137.897, 
-        farPlane=199.553, width=108.655, height=62.2707, cameraPosition=(
-        72.7386, 219.069, 25.1232), cameraUpVector=(0.981238, -0.192104, 
-        0.0164036), cameraTarget=(96.8568, 52.6318, 44.775), 
-        viewOffsetX=1.37465, viewOffsetY=-1.62172)
-    print_png(name+'_tibia_t')
+# def tibia_t(name):
+    # replace_leaf_fn(leaf_tibia)
+    # viewportObj.view.setValues(nearPlane=137.897, 
+        # farPlane=199.553, width=108.655, height=62.2707, cameraPosition=(
+        # 72.7386, 219.069, 25.1232), cameraUpVector=(0.981238, -0.192104, 
+        # 0.0164036), cameraTarget=(96.8568, 52.6318, 44.775), 
+        # viewOffsetX=1.37465, viewOffsetY=-1.62172)
+    # print_png(name+'_tibia_t')
 
 
 def femur_b(name):
-    viewportObj.odbDisplay.displayGroup.replace(leaf=leaf_femur)
+    replace_leaf_fn(leaf_femur)
+    viewportObj.view.setProjection(projection=PERSPECTIVE)
     viewportObj.view.setValues(nearPlane=102.691, 
         farPlane=196.321, width=110.252, height=63.1861, cameraPosition=(
         56.5754, 219.107, 23.7612), cameraUpVector=(0.97178, -0.177, 0.155934), 
@@ -869,31 +853,47 @@ def femur_b(name):
     print_png(name+'_femur_b')
 
 
-def femur_t(name):
-    viewportObj.odbDisplay.displayGroup.replace(leaf=leaf_femur)
-    viewportObj.view.setValues(nearPlane=111.634, 
-        farPlane=197.23, width=119.855, height=68.6894, cameraPosition=(
-        71.5149, -80.5323, 40.7028), cameraUpVector=(0.944316, 0.290544, 
-        0.154442), cameraTarget=(77.6068, 88.53, 47.7491), viewOffsetX=1.21754, 
-        viewOffsetY=-0.116666)
-    print_png(name+'_femur_t')
+# def femur_t(name):
+    # replace_leaf_fn(leaf_femur)
+    # viewportObj.view.setValues(nearPlane=111.634, 
+        # farPlane=197.23, width=119.855, height=68.6894, cameraPosition=(
+        # 71.5149, -80.5323, 40.7028), cameraUpVector=(0.944316, 0.290544, 
+        # 0.154442), cameraTarget=(77.6068, 88.53, 47.7491), viewOffsetX=1.21754, 
+        # viewOffsetY=-0.116666)
+    # print_png(name+'_femur_t')
 
 def full_cartilage(name):
-    viewportObj.odbDisplay.displayGroup.replace(leaf=leaf_cartilage)
+    replace_leaf_fn(leaf=leaf_cartilage)
     viewportObj.view.setValues(nearPlane=63.5544, 
         farPlane=186.566, width=72.5957, height=41.605, cameraPosition=(
         178.436, 85.7841, -35.0266), cameraUpVector=(-0.455834, 0.87901, 
         0.139848), cameraTarget=(54.1926, 66.9635, 78.453), 
         viewOffsetX=1.13032, viewOffsetY=-5.57586)
+    viewportObj.view.setProjection(projection=PARALLEL)
+    viewportObj.view.fitView()
     print_png(name+'_full_cartilage')
 
-tibia_b('mises')
-tibia_t('mises')
-femur_b('mises')
-femur_t('mises')
-full_cartilage('deformation')
-tibia_b('fibril')
-tibia_t('fibril')
-femur_b('fibril')
-femur_t('fibril')
 
+
+
+viewportObj.odbDisplay.display.setValues(plotState=(CONTOURS_ON_DEF, ))
+viewportObj.viewportAnnotationOptions.setValues(
+    legendBox=OFF, triad=OFF, legendNumberFormat=FIXED, title=OFF, state=OFF
+    )
+
+odbname = viewportObj.odbDisplay.name
+frame1 = session.scratchOdbs[odbname].steps['Session Step'].frames[0]
+viewportObj.odbDisplay.setFrame(frame=frame1)
+
+viewportObj.odbDisplay.contourOptions.setValues(
+    numIntervals=6, maxAutoCompute=OFF, maxValue=0.14, minAutoCompute=OFF, minValue=-0.0
+    )
+for label in ['Mises Stress (MPa)', 'Fibrillar Mises Stress (MPa)']:
+    viewportObj.odbDisplay.setPrimaryVariable(variableLabel=label, outputPosition=INTEGRATION_POINT)
+    tibia_b(label)
+    femur_b(label)
+
+label = 'Deformation magnitude (mm)'
+viewportObj.odbDisplay.setPrimaryVariable(variableLabel=label, outputPosition=NODAL)
+viewportObj.odbDisplay.contourOptions.setValues(maxAutoCompute=ON, minAutoCompute=ON)
+full_cartilage(label)
