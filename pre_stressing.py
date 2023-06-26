@@ -134,7 +134,6 @@ def copy_job(NameOfNewJob, nameOfCopiedJob):
 
 
 def open_odb(odbName, readOnly=True):
-    
     _open_odb_fn = lambda: session.openOdb(name=odbName, readOnly=readOnly)
     try:
         return _open_odb_fn()
@@ -146,7 +145,6 @@ def open_odb(odbName, readOnly=True):
 
 
 def close_odb(odbName, saveOdb = False):
-    
     try:
         odbObj = session.odbs[odbName]
         
@@ -292,7 +290,7 @@ class nonlipls_tools():
             centralPoint = np.mean(np.concatenate((topCoords, bottomCoords)), axis = 0, dtype=np.float32)
             centralPoint += 1e-8 # just to avoid zero devision
             
-            ####### extractine integration point data #######
+            ####### extracting integration point data #######
             pointSetCoords = []
             for fieldName in ['SDV91', 'SDV92', 'SDV93']:
                 valueObj = frameObj0.fieldOutputs[fieldName].getSubset(region=regionElementSets[cartilageKey],
@@ -449,14 +447,6 @@ class nonlipls_tools():
         mdb.jobs[self.jobName].setValues(model=self.modelName)
         steps = mdb.models[self.modelName].steps
         stepsWithoutEQ = modelWithoutOptimizaionObj.steps
-        
-        # for stepName in steps.keys():
-        #     if stepName in ['Initial', self.stepName]:
-        #         continue
-        #     
-        #     steps[stepName].suppress()
-        #     stepsWithoutEQ[stepName].suppress()
-        #     mdb.models[self.modelNameInverse].steps[stepName].suppress()
         
         BCobj = mdb.models[self.modelNameInverse].boundaryConditions
         BCkeys = BCobj.keys()
@@ -694,10 +684,8 @@ class nonlipls_tools():
             return 'COMPLETED'
 
 
-
 os.chdir('C:\\Temp\\pre_stress_3d')
 openMdb(pathName = 'open_knee.cae')
-
 
 start_time = time.time()
 
@@ -712,9 +700,6 @@ print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%
 
 # img dir
 os.mkdir('img')
-
-
-
 
 # Convergence plot:
 SMALL_SIZE = 20//1.4
@@ -750,21 +735,7 @@ plt.savefig('img/convergence_plot.png', dpi=300)
 
 plt.show()
 
-
-
-# mdb.models['knee-withEQ'].steps['LOAD'].suppress()
-# session.viewports['Viewport: 1'].assemblyDisplay.setValues(step='Initial')
-# session.viewports['Viewport: 1'].assemblyDisplay.setValues(step='EQ')
-# mdb.models['knee-withEQ'].fieldOutputRequests['EQ'].setValues(
-    # frequency=LAST_INCREMENT, position=INTEGRATION_POINTS)
-
-# nonliplsTools.job_submit('knee-withEQ')
-
-
-# creating fibrillar stress
-
-
-
+# Creating out variables to report
 viewportObj = session.viewports['Viewport: 1']
 session.printOptions.setValues(reduceColors=False)
 session.pngOptions.setValues(imageSize=(4000, 2289))
