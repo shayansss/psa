@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from functools import partial
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 
 def job_submit(
@@ -248,7 +248,7 @@ class nonlipls_tools():
                 stepObj.resume()
     
     def initialize_params(self, *keys):
-        
+        # finding the normalized depth and local plan, and initializing the parameters.
         
         if os.path.exists(self.txtFolderName):
             rmtree(self.txtFolderName)
@@ -416,10 +416,11 @@ class nonlipls_tools():
             sdvList=['SDV%s'%(i) for i in (range(1,4) + range(16,43))],
             zeta=1.0, 
             breakPoint=0, 
-            errorLimit=1e-4,
+            errorLimit=1e-3,
             maxiteration=50,
-            eta=1.5
+            eta=4.0,
             ):
+        # main pre-stress function
         zeta = float(zeta) # avoiding problem with integer division
         modelWithoutOptimizaionObj = mdb.models[self.modelNameWithoutOptimizaion]
         self._set_umat_key(modelWithoutOptimizaionObj, 1.0)
@@ -505,15 +506,15 @@ class nonlipls_tools():
                 if num % 4 == 1:
                     nodeLabel = i
                 elif num % 4 == 2:
-                    u1 = i
+                    u1 = -i
                 elif num % 4 == 3:
-                    u2 = i
+                    u2 = -i
                 elif num % 4 == 0:
-                    u3 = i
+                    u3 = -i
                     rootAssemblyObj.editNode(nodes=rootAssemblyObj.sets[nodeLabel].nodes[0],
-	                                         offset1=-u1,
-	                                         offset2=-u2,
-	                                         offset3=-u3,
+	                                         offset1=u1,
+	                                         offset2=u2,
+	                                         offset3=u3,
 	                                         projectToGeometry=OFF)
         
         def _inverse_run(displacementFromInitial):
@@ -592,8 +593,7 @@ class nonlipls_tools():
         self.optimizerStatus = {'step': [1], 'error': [newError], 'zeta': [zeta]}
         
         failed=False
-        iterationNumber = 0
-        # breakPoint = 0
+        iterationNumber = 1
         
         newSdvDataBackup = _integration_points_values(odbObjWithoutOptimization, sdvList, 0)
         close_odb(self.odbNameWithoutOptimizaion)
@@ -607,14 +607,11 @@ class nonlipls_tools():
             else:
                 iterationNumber += 1
             
-            # if (zeta < 0.5) and (iterationNumber - breakPoint > 5):
-                # zeta = zeta*2
-            
             copy_model(self.modelName + '-Backup', self.modelName)
             _edit_node_by_offset(displacementFromInitial, self.modelName)
             copy_model(self.modelNameInverse + '-Backup', self.modelNameInverse)
-            _edit_node_by_offset(displacementFromInitial, self.modelNameInverse)
             _inverse_run(displacementFromInitial)
+            _edit_node_by_offset(displacementFromInitial, self.modelNameInverse)
             odbInverse = open_odb(self.odbNameInverse)
             newSdvData = _integration_points_values(odbInverse, sdvList, -1)
             close_odb(self.odbNameInverse)
@@ -633,7 +630,7 @@ class nonlipls_tools():
             
             print '\n** #STEP: %s | ERROR: %s | ZETA: %s **\n' % (iterationNumber, newError, zeta)
             
-            self.optimizerStatus['step'].append(iterationNumber+1)
+            self.optimizerStatus['step'].append(iterationNumber)
             self.optimizerStatus['error'].append(newError)
             self.optimizerStatus['zeta'].append(zeta)
             
@@ -653,14 +650,8 @@ class nonlipls_tools():
                     failed = True
                     break
                 
-                # if breakPoint != iterationNumber:
-                    # copy_model(self.modelName, self.modelName + '-Backup')
-                    # copy_model(self.modelNameInverse, self.modelNameInverse + '-Backup')
-                
                 copy_model(self.modelName, self.modelName + '-Backup')
                 copy_model(self.modelNameInverse, self.modelNameInverse + '-Backup')
-                
-                # breakPoint = iterationNumber
         
         # finish_optimization
         modelsObj = mdb.models
@@ -722,20 +713,17 @@ fig, ax1 = plt.subplots()
 
 ax1.plot(x, y1, color='blue', linestyle='-', linewidth=2)
 ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
-# ax1.grid(True)
 ax1.tick_params(axis='y')
 ax1.set_xlabel('Step')
 ax1.set_ylabel('Error')
-# ax1.set_yscale('log')
 
 ax1.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.2f}'.format(y))) 
 ax1.tick_params(axis='y')
 fig.tight_layout()
 plt.savefig('img/convergence_plot.png', dpi=300)
+# plt.show()
 
-plt.show()
-
-# Creating out variables to report
+# Creating variables to report
 viewportObj = session.viewports['Viewport: 1']
 session.printOptions.setValues(reduceColors=False)
 session.pngOptions.setValues(imageSize=(4000, 2289))
@@ -768,12 +756,6 @@ sessionFrameObj.FieldOutput(
     )
 
 sessionFrameObj.FieldOutput(
-    name='Mises Stress (MPa)', 
-    description='',
-    field=fieldOutputsObj['S'].getScalarField(invariant=MISES)
-    )
-
-sessionFrameObj.FieldOutput(
     name='Deformation magnitude (mm)', 
     description='',
     field=fieldOutputsObj['U'].getScalarField(invariant=MAGNITUDE)
@@ -796,7 +778,8 @@ leaf_cartilage = dgo.LeafFromOdbElementMaterials(elementMaterials=('CAR_UMAT', )
 
 replace_leaf_fn = lambda leaf: viewportObj.odbDisplay.displayGroup.replace(leaf=leaf)
 
-# drawing contours
+# drawing contours using the following helper functions
+# note that these functions are set to my screen; you can adjust them.
 def tibia_b(name):
     replace_leaf_fn(leaf_tibia)
     viewportObj.view.setProjection(projection=PERSPECTIVE)
@@ -843,10 +826,10 @@ viewportObj.odbDisplay.setFrame(frame=frame1)
 viewportObj.odbDisplay.contourOptions.setValues(
     numIntervals=6, maxAutoCompute=OFF, maxValue=0.12, minAutoCompute=OFF, minValue=0.0
     )
-for label in ['Mises Stress (MPa)', 'Fibrillar Mises Stress (MPa)']:
-    viewportObj.odbDisplay.setPrimaryVariable(variableLabel=label, outputPosition=INTEGRATION_POINT)
-    tibia_b(label)
-    femur_b(label)
+label = 'Fibrillar Mises Stress (MPa)'
+viewportObj.odbDisplay.setPrimaryVariable(variableLabel=label, outputPosition=INTEGRATION_POINT)
+tibia_b(label)
+femur_b(label)
 
 label = 'Deformation magnitude (mm)'
 viewportObj.odbDisplay.setPrimaryVariable(variableLabel=label, outputPosition=NODAL)

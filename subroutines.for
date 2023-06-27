@@ -4,8 +4,8 @@ C    This program computes the constitutive behavior of soft tissues
 C    by advanced contrained mixture theory and pre-stressing effects.
 C    It is particularly developed to be combined with the soil 
 C    consolidation theory in Abaqus to encompass the fluid mechanics,
-C    along with the pre-stressed poroelasticity, and elecrochemically
-C    induced osmotic pressure. This file should be run together with
+C    along with the pre-stressed poroelasticity, and electrochemically
+C    induced osmotic pressure. This code should be run together with
 C    pre_stressing.py to get all the required parameters, defining
 C    the exact soft tissue model (typically articular cartilage).
 C====================================================================
@@ -49,7 +49,7 @@ C     94 - 96 --->  UPDATED COORDS
 C
 C
       FilLoc = 'C:\temp\pre_stress_3d\txt\DATA.txt'
-      LenFil = LEN_TRIM(FILLOC)  ! length of FilLoc
+      LenFil = LEN_TRIM(FILLOC)
 C
       OPEN(UNIT=29,FILE=FilLoc(:LenFil),STATUS='OLD')
        READ(29,*,end=10) k0 ! it is an identifer (pre-stressing, initial parameter defenition, ...)
@@ -304,7 +304,7 @@ C      GM=723D0
        NSTR(K6)=-DELTAV(K6)*W6+BVEC(K6)*W5
       ENDDO
       DO K1=1,NTENS
-        STATEV(75+K1)=NSTR(K1) ! STRESS IN THE FIBRILLAR PART
+        STATEV(75+K1)=NSTR(K1) ! STRESS IN THE NON-FIBRILLAR PART
       ENDDO
 C
       IF (PROPS(3).EQ.1) THEN
@@ -313,7 +313,7 @@ C
         ALPHA2=ZERO ! GAG CONSTANT
         DETC=ONE
        ELSE
-        DETC=DET/STATEV(15) ! CURRENT VOLUME CHANGE FROM THE PRESTRESSED STATE
+        DETC=DET/STATEV(15) ! CURRENT VOLUME CHANGE FROM THE PRE-STRESSED STATE
         ALPHA2=PROPS(4)
        ENDIF
        GAG=ALPHA1*(DETC**(-ALPHA2))
