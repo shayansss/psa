@@ -213,6 +213,7 @@ class nonlipls_tools():
         self.materialName = materialName
         self.numSdv = numSdv
         self.sectionName = sectionName
+        self.subroutineFile = subroutineFile
         
         self.job_submit = partial(
             job_submit, subroutineFile=subroutineFile, intruptWithError=True
@@ -412,7 +413,8 @@ class nonlipls_tools():
     
     def run_prestress_optimizer(
             self,
-            key,
+            setKey,
+            instanceNames = ['tibia_cartilage_LAT-1', 'tibia_cartilage_MED-1', 'femur_cartilage-1'],
             sdvList=['SDV%s'%(i) for i in (range(1,4) + range(16,43))],
             zeta=1.0, 
             breakPoint=0, 
@@ -427,8 +429,8 @@ class nonlipls_tools():
         self._focus_on_first_step(modelWithoutOptimizaionObj)
         
         # ensure the correct naming of all cartilage sets.
-        nodeSet = key + '_NODES'
-        elementSet = key + '_ELEMENTS'
+        nodeSet = setKey + '_NODES'
+        elementSet = setKey + '_ELEMENTS'
         
         # creating helper models, jobs, sets, and BCs
         rootAssemblyObj = modelWithoutOptimizaionObj.rootAssembly
@@ -441,33 +443,45 @@ class nonlipls_tools():
         for name in [self.modelName, self.modelNameInverse]:
             copy_model(name, self.modelNameWithoutOptimizaion)
         
-        for name in [self.jobName, self.jobNameInverse]:
-            copy_job(name, self.jobNameWithoutOptimizaion)
+        # for name in [self.jobName, self.jobNameInverse]:
+        #     copy_job(name, self.jobNameWithoutOptimizaion)
         
-        mdb.jobs[self.jobNameInverse].setValues(model=self.modelNameInverse)
+        # mdb.jobs[self.jobNameInverse].setValues(model=self.modelNameInverse)
+        copy_job(self.jobName, self.jobNameWithoutOptimizaion)
         mdb.jobs[self.jobName].setValues(model=self.modelName)
-        steps = mdb.models[self.modelName].steps
-        stepsWithoutEQ = modelWithoutOptimizaionObj.steps
+        mdb.JobFromInputFile(name=self.jobNameInverse, 
+            inputFileName=os.path.join(os.getcwd(), self.jobNameInverse+'.inp'),
+            type=ANALYSIS, atTime=None, waitMinutes=0, waitHours=0, queue=None, memory=90, 
+            memoryUnits=PERCENTAGE, getMemoryFromAnalysis=True, 
+            explicitPrecision=SINGLE, nodalOutputPrecision=SINGLE, 
+            userSubroutine=self.subroutineFile, scratch='', resultsFormat=ODB, 
+            parallelizationMethodExplicit=DOMAIN, numDomains=1, 
+            activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=1, 
+            numGPUs=0)
         
-        BCobj = mdb.models[self.modelNameInverse].boundaryConditions
-        BCkeys = BCobj.keys()
+        # modelObjTemp = mdb.models[self.modelNameInverse]
+        # 
+        # for key in modelObjTemp.boundaryConditions.keys():
+        #     modelObjTemp.boundaryConditions[key].suppress()
+        # 
+        # for key in modelObjTemp.constraints.keys():
+        #     del modelObjTemp.constraints[key]
+        # 
+        # for instance in modelObjTemp.rootAssembly.instances.keys():
+        #     if instance not in instanceNames:
+        #         del modelObjTemp.rootAssembly.instances[instance]
         
-        for i in BCkeys:
-            BCobj[i].suppress()
-        
-        modelObjTemp = mdb.models[self.modelNameInverse]
-        
-        for i in xrange(len(nodeNameList)):
-            modelObjTemp.VelocityBC(name=nodeNameList[i], # bc name and node names are the same.
-                                    createStepName='Initial',
-                                    region=modelObjTemp.rootAssembly.sets[nodeNameList[i]],
-                                    v1=SET,
-                                    v2=SET,
-                                    v3=SET,
-                                    amplitude=UNSET,
-                                    localCsys=None,
-                                    distributionType=UNIFORM,
-                                    fieldName='')
+        # for i in xrange(len(nodeNameList)):
+        #     modelObjTemp.VelocityBC(name=nodeNameList[i], # bc name and node names are the same.
+        #                             createStepName='Initial',
+        #                             region=modelObjTemp.rootAssembly.sets[nodeNameList[i]],
+        #                             v1=SET,
+        #                             v2=SET,
+        #                             v3=SET,
+        #                             amplitude=UNSET,
+        #                             localCsys=None,
+        #                             distributionType=UNIFORM,
+        #                             fieldName='')
         
         # some helper functions
         def _integration_points_values(odb, parameters=['SDV3'], frameNum=-1):
@@ -517,36 +531,6 @@ class nonlipls_tools():
 	                                         offset3=u3,
 	                                         projectToGeometry=OFF)
         
-        def _inverse_run(displacementFromInitial):
-            ModelObjTemp = mdb.models[self.modelNameInverse]
-            bcStateObj = ModelObjTemp.steps[self.stepName].boundaryConditionStates
-            num = 0
-            for i in displacementFromInitial:
-                num += 1
-                if num % 4 == 1:
-                    bcLabel = i
-                elif num % 4 == 2:
-                    # v1 = bcStateObj[bcLabel].v1-i
-                    v1 = -i
-                elif num % 4 == 3:
-                    # v2 = bcStateObj[bcLabel].v2-i
-                    v2 = -i
-                elif num % 4 == 0:
-                    # v3 = bcStateObj[bcLabel].v3-i
-                    v3 = -i
-                    ModelObjTemp.boundaryConditions[bcLabel].setValuesInStep(stepName=self.stepName,
-                                                                             v1=v1,
-                                                                             v2=v2,
-                                                                             v3=v3)
-            
-            with open(os.path.join(self.txtFolderName, 'DATA.txt'), "w") as f:
-                f.write('-1\n')
-            
-            self.job_submit(self.jobNameInverse)
-            
-            with open(os.path.join(self.txtFolderName, 'DATA.txt'), "w") as f:
-                f.write('1\n')
-        
         def _new_SDV_in_fortran(newSdvData):
             IntegrationPointArray = np.unique(newSdvData[0][2::3]) # [1.0, 2.0, 3.0, 4.0, ...]
             IntegrationCount = IntegrationPointArray[-1].max() # number of all integration points
@@ -571,6 +555,172 @@ class nonlipls_tools():
         odbObjWithoutOptimization = open_odb(self.odbNameWithoutOptimizaion)
         initialNodalCoords = _extract_coords_values(odbObjWithoutOptimization, 0)
         copyfile(self.odbNameWithoutOptimizaion, self.odbName)
+        copyfile(self.jobNameWithoutOptimizaion+'.inp', self.jobName+'.inp')
+        
+        def _inverse_run(displacementFromInitial):
+            # writing backward keywords
+            f = open(self.jobName+'.inp')
+            lines = f.readlines()
+            f.close()
+            
+            def _get_data(instance):
+                indices_instances = [i for i, line in enumerate(lines) if line.startswith("** PART INSTANCE")]
+                indices = [i for i, line in enumerate(lines) if line.startswith("** PART INSTANCE: "+instance)]
+                
+                elements = []
+                nodes = []
+                idx = indices[0]
+                n = 1
+                while True:
+                    n += 1
+                    line = lines[idx + n]
+                    if line == '*Node\n':
+                        # this is node data
+                        n += 1
+                        node_header = line
+                        line = lines[idx + n]
+                        while not line.startswith("*"):
+                            n += 1
+                            nodes.append(line)
+                            line = lines[idx + n]
+                    if line[:8] == '*Element':
+                        # this is element data
+                        n += 1
+                        element_header = line
+                        line = lines[idx + n]
+                        while not line.startswith("*"):
+                            n += 1
+                            elements.append(line)
+                            line = lines[idx + n]
+                    
+                    if "**" in line:
+                        break
+                return element_header, node_header, elements, nodes
+            
+            elements = []
+            nodes = []
+            for instance in instanceNames:
+                element_header, node_header, new_elements, new_nodes = _get_data(instance)
+                nodes += new_nodes
+                elements += new_elements
+            
+            node_nums = [node.split(",")[0].strip() for node in nodes]
+            
+            nset = ["*Nset, nset="+nodeSet]
+            nset += [','.join(node_nums[i:i+16]) for i in range(0, len(node_nums), 16)]
+            nset = [node+'\n' for node in nset]
+            
+            temp_sets = ""
+            idx = lines.index("*Nset, nset=TEMP-1\n")
+            
+            while True:
+                if not lines[idx].startswith("*Nset, nset=TEMP-"):
+                    if not lines[idx-1].startswith("*Nset, nset=TEMP-"):
+                        break
+                
+                temp_sets += lines[idx]
+                idx += 1
+            
+            element_nums = []
+            subline = 1
+            for element in elements:
+                if subline == 1:
+                    element_nums.append(element.split(",")[0].strip())
+                    if element[-3] == ',':
+                        subline += 1
+                    else:
+                        subline += 0
+            
+            elset = ['*Elset, elset='+elementSet]
+            elset += [','.join(element_nums[i:i+16]) for i in range(0, len(element_nums), 16)]
+            elset = [element+'\n' for element in elset]
+            
+            nodes = [node_header] + nodes
+            elements = [element_header] + elements
+            
+            if '** ELEMENT CONTROLS\n' in lines:
+                idx = lines.index('** ELEMENT CONTROLS\n')
+                control = lines[idx+2] + lines[idx+3]
+            else:
+                control = ''
+            
+            materials = ''
+            idx = lines.index('** MATERIALS\n') + 1
+            
+            while True:
+                idx += 1
+                if "**" in lines[idx]:
+                    break
+                else:
+                    materials += lines[idx]
+            
+            section = lines[lines.index("** Section: CAR\n")+1]
+            section = section.split(',')
+            section[1] = ' elset='+elementSet
+            section = ",".join(section)
+            
+            first_lines = "".join(nodes + elements + nset + elset)
+            first_lines += temp_sets + section + control + materials
+            first_lines += "*Step, name=EQ, nlgeom=YES, unsymm=YES\n"
+            first_lines += "*Static\n"
+            first_lines += "1., 1., 1e-05, 1.\n"
+            
+            conditions = '*Initial Conditions, TYPE=RATIO\n'
+            if conditions in lines:
+                idx = lines.index(conditions) + 1
+                line = nodeSet + ', ' + lines[idx].split(',')[1]
+                conditions += line
+            else:
+                conditions = ''
+            
+            conditions += "*INITIAL CONDITIONS, TYPE=SOLUTION, USER\n"
+            
+            final_lines = conditions + "*Restart, write, frequency=0\n"
+            final_lines += "*Output, field, frequency=99999\n"
+            final_lines += "*Node Output\n"
+            final_lines += "COORD, U, UR\n"
+            final_lines += "*Element Output, directions=YES\n"
+            final_lines += "LE, S, SDV\n"
+            final_lines += "*Output, history, frequency=0\n"
+            final_lines += "*End Step\n"
+            
+            # ModelObjTemp = mdb.models[self.modelNameInverse]
+            # bcStateObj = ModelObjTemp.steps[self.stepName].boundaryConditionStates
+            # num = 0
+            # for i in displacementFromInitial:
+            #     num += 1
+            #     if num % 4 == 1:
+            #         bcLabel = i
+            #     elif num % 4 == 2:
+            #         # v1 = bcStateObj[bcLabel].v1-i
+            #         v1 = -i
+            #     elif num % 4 == 3:
+            #         # v2 = bcStateObj[bcLabel].v2-i
+            #         v2 = -i
+            #     elif num % 4 == 0:
+            #         # v3 = bcStateObj[bcLabel].v3-i
+            #         v3 = -i
+            #         ModelObjTemp.boundaryConditions[bcLabel].setValuesInStep(stepName=self.stepName,
+            #                                                                  v1=v1,
+            #                                                                  v2=v2,
+            #                                                                  v3=v3)
+            labels = displacementFromInitial[::4]
+            line_1_bc = ["*Boundary, type=VELOCITY\n"] * len(labels)
+            line_2_bc = ["%s, 1, 1, %s\n"%(i, j) for i, j in zip(labels, displacementFromInitial[1::4])]
+            line_3_bc = ["%s, 2, 2, %s\n"%(i, j) for i, j in zip(labels, displacementFromInitial[2::4])]
+            line_4_bc = ["%s, 3, 3, %s\n"%(i, j) for i, j in zip(labels, displacementFromInitial[3::4])]
+            bc = "".join([i+j+k+l for i, j, k, l in zip(line_1_bc, line_2_bc, line_3_bc, line_4_bc)])
+            
+            with open(self.jobNameInverse+".inp", "w") as f:
+                f.write(first_lines + bc + final_lines)
+            
+            with open(os.path.join(self.txtFolderName, 'DATA.txt'), "w") as f:
+                f.write('-1\n')
+            
+            self.job_submit(self.jobNameInverse, SDVINI=False)
+            
+            with open(os.path.join(self.txtFolderName, 'DATA.txt'), "w") as f:
+                f.write('1\n')
         
         def _calculate_r_u(zeta):
             odb = open_odb(self.odbName)
@@ -587,7 +737,7 @@ class nonlipls_tools():
                 )) / zeta
             
             return newError, displacementFromInitial
-            
+        
         newError, displacementFromInitial = _calculate_r_u(zeta)
         
         self.optimizerStatus = {'step': [1], 'error': [newError], 'zeta': [zeta]}
@@ -611,7 +761,7 @@ class nonlipls_tools():
             _edit_node_by_offset(displacementFromInitial, self.modelName)
             copy_model(self.modelNameInverse + '-Backup', self.modelNameInverse)
             _inverse_run(displacementFromInitial)
-            _edit_node_by_offset(displacementFromInitial, self.modelNameInverse)
+            # _edit_node_by_offset(displacementFromInitial, self.modelNameInverse)
             odbInverse = open_odb(self.odbNameInverse)
             newSdvData = _integration_points_values(odbInverse, sdvList, -1)
             close_odb(self.odbNameInverse)
@@ -683,6 +833,19 @@ start_time = time.time()
 # run PSA
 nonliplsTools = nonlipls_tools('knee', 'knee')
 nonliplsTools.initialize_params('LAT_CARTILAGE', 'MED_CARTILAGE', 'FEMUR_CARTILAGE')
+
+# nonliplsTools.run_prestress_optimizer('LAT_CARTILAGE', ['tibia_cartilage_LAT-1'])
+
+# elapsed_time = time.time() - start_time
+# print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%3600)//60)
+
+
+
+
+
+
+
+# nonliplsTools.run_prestress_optimizer('FEMUR_CARTILAGE')
 nonliplsTools.run_prestress_optimizer('ARTICULAR_CARTILAGE')
 
 elapsed_time = time.time() - start_time
@@ -708,6 +871,36 @@ plt.rc('figure', titlesize=BIGGER_SIZE)
 x = nonliplsTools.optimizerStatus['step']
 y1 = nonliplsTools.optimizerStatus['error']
 y2 = nonliplsTools.optimizerStatus['zeta']
+
+x_femur = x[:]
+y1_femur = y1[:]
+y2_femur = y2[:]
+
+
+
+
+
+start_time = time.time()
+nonliplsTools.run_prestress_optimizer('LAT_CARTILAGE')
+elapsed_time = time.time() - start_time
+
+print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%3600)//60)
+
+x = nonliplsTools.optimizerStatus['step']
+y1 = nonliplsTools.optimizerStatus['error']
+y2 = nonliplsTools.optimizerStatus['zeta']
+
+# x_lat = x[:]
+# y1_lat = y1[:]
+# y2_lt = y2[:]
+
+
+
+
+
+
+
+
 
 fig, ax1 = plt.subplots()
 
@@ -824,7 +1017,7 @@ frame1 = session.scratchOdbs[odbname].steps['Session Step'].frames[0]
 viewportObj.odbDisplay.setFrame(frame=frame1)
 
 viewportObj.odbDisplay.contourOptions.setValues(
-    numIntervals=6, maxAutoCompute=OFF, maxValue=0.12, minAutoCompute=OFF, minValue=0.0
+    contourStyle=CONTINUOUS, maxAutoCompute=OFF, maxValue=0.25, minAutoCompute=OFF, minValue=0.0
     )
 label = 'Fibrillar Mises Stress (MPa)'
 viewportObj.odbDisplay.setPrimaryVariable(variableLabel=label, outputPosition=INTEGRATION_POINT)
