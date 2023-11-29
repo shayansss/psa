@@ -1,5 +1,5 @@
 # PSA: Pre-Stress Algorithm for Articular Cartilage
-This repository contains the core data corresponding to our submitted manuscript, titled "Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage".
+This repository contains the core data corresponding to our accepted manuscript, titled "Large-Scale Finite Element Modeling of Pre-Stress in Articular Cartilage".
 
 Pre-stressing in multi-phasic models of articular cartilage affects its soft structure, subsequently altering the material due to fluid diffusion within the solid structure. Given that the initial state of the cartilage prior to the pre-stressed state (where finite element analysis typically begins) is unknown, we have developed a unified optimizer to find that state. This optimizer has proven suitable for large-scale pre-stressing analysis. The value of such an algorithm lies in its efficiency; it is not overly time-consuming and allows us to include the crucial osmotic pressure phase (which causes pre-stressing) alongside the other phases at a large scale.
 
