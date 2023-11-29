@@ -459,30 +459,6 @@ class nonlipls_tools():
             activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=1, 
             numGPUs=0)
         
-        # modelObjTemp = mdb.models[self.modelNameInverse]
-        # 
-        # for key in modelObjTemp.boundaryConditions.keys():
-        #     modelObjTemp.boundaryConditions[key].suppress()
-        # 
-        # for key in modelObjTemp.constraints.keys():
-        #     del modelObjTemp.constraints[key]
-        # 
-        # for instance in modelObjTemp.rootAssembly.instances.keys():
-        #     if instance not in instanceNames:
-        #         del modelObjTemp.rootAssembly.instances[instance]
-        
-        # for i in xrange(len(nodeNameList)):
-        #     modelObjTemp.VelocityBC(name=nodeNameList[i], # bc name and node names are the same.
-        #                             createStepName='Initial',
-        #                             region=modelObjTemp.rootAssembly.sets[nodeNameList[i]],
-        #                             v1=SET,
-        #                             v2=SET,
-        #                             v3=SET,
-        #                             amplitude=UNSET,
-        #                             localCsys=None,
-        #                             distributionType=UNIFORM,
-        #                             fieldName='')
-        
         # some helper functions
         def _integration_points_values(odb, parameters=['SDV3'], frameNum=-1):
             
@@ -683,27 +659,6 @@ class nonlipls_tools():
             final_lines += "LE, S, SDV\n"
             final_lines += "*Output, history, frequency=0\n"
             final_lines += "*End Step\n"
-            
-            # ModelObjTemp = mdb.models[self.modelNameInverse]
-            # bcStateObj = ModelObjTemp.steps[self.stepName].boundaryConditionStates
-            # num = 0
-            # for i in displacementFromInitial:
-            #     num += 1
-            #     if num % 4 == 1:
-            #         bcLabel = i
-            #     elif num % 4 == 2:
-            #         # v1 = bcStateObj[bcLabel].v1-i
-            #         v1 = -i
-            #     elif num % 4 == 3:
-            #         # v2 = bcStateObj[bcLabel].v2-i
-            #         v2 = -i
-            #     elif num % 4 == 0:
-            #         # v3 = bcStateObj[bcLabel].v3-i
-            #         v3 = -i
-            #         ModelObjTemp.boundaryConditions[bcLabel].setValuesInStep(stepName=self.stepName,
-            #                                                                  v1=v1,
-            #                                                                  v2=v2,
-            #                                                                  v3=v3)
             labels = displacementFromInitial[::4]
             line_1_bc = ["*Boundary, type=VELOCITY\n"] * len(labels)
             line_2_bc = ["%s, 1, 1, %s\n"%(i, j) for i, j in zip(labels, displacementFromInitial[1::4])]
@@ -828,34 +783,19 @@ class nonlipls_tools():
 os.chdir('C:\\Temp\\pre_stress_3d')
 openMdb(pathName = 'open_knee.cae')
 
+# run PSA
 start_time = time.time()
 
-# run PSA
 nonliplsTools = nonlipls_tools('knee', 'knee')
 nonliplsTools.initialize_params('LAT_CARTILAGE', 'MED_CARTILAGE', 'FEMUR_CARTILAGE')
-
-# nonliplsTools.run_prestress_optimizer('LAT_CARTILAGE', ['tibia_cartilage_LAT-1'])
-
-# elapsed_time = time.time() - start_time
-# print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%3600)//60)
-
-
-
-
-
-
-
-# nonliplsTools.run_prestress_optimizer('FEMUR_CARTILAGE')
 nonliplsTools.run_prestress_optimizer('ARTICULAR_CARTILAGE')
 
 elapsed_time = time.time() - start_time
 print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%3600)//60)
 
-
-# img dir
+# Saving the results
 os.mkdir('img')
 
-# Convergence plot:
 SMALL_SIZE = 20//1.4
 MEDIUM_SIZE = 24//1.4
 BIGGER_SIZE = 28//1.4
@@ -872,36 +812,6 @@ x = nonliplsTools.optimizerStatus['step']
 y1 = nonliplsTools.optimizerStatus['error']
 y2 = nonliplsTools.optimizerStatus['zeta']
 
-x_femur = x[:]
-y1_femur = y1[:]
-y2_femur = y2[:]
-
-
-
-
-
-start_time = time.time()
-nonliplsTools.run_prestress_optimizer('LAT_CARTILAGE')
-elapsed_time = time.time() - start_time
-
-print "Runtime: %i hour(s) and %i minute(s)"%(elapsed_time//3600, (elapsed_time%3600)//60)
-
-x = nonliplsTools.optimizerStatus['step']
-y1 = nonliplsTools.optimizerStatus['error']
-y2 = nonliplsTools.optimizerStatus['zeta']
-
-# x_lat = x[:]
-# y1_lat = y1[:]
-# y2_lt = y2[:]
-
-
-
-
-
-
-
-
-
 fig, ax1 = plt.subplots()
 
 ax1.plot(x, y1, color='blue', linestyle='-', linewidth=2)
@@ -914,13 +824,10 @@ ax1.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.2f}'.format(y)))
 ax1.tick_params(axis='y')
 fig.tight_layout()
 plt.savefig('img/convergence_plot.png', dpi=300)
-# plt.show()
 
-# Creating variables to report
 viewportObj = session.viewports['Viewport: 1']
 session.printOptions.setValues(reduceColors=False)
 session.pngOptions.setValues(imageSize=(4000, 2289))
-
 
 odbObj = open_odb('knee-withEQ.odb')
 fieldOutputsObj = odbObj.steps['EQ'].frames[-1].fieldOutputs
