@@ -6,7 +6,7 @@ Pre-stressing in multi-phasic models of articular cartilage affects its soft str
 ## Dependencies
 - Visual Studio 2019 or later (Community edition or higher)
 - Intel® Parallel Studio XE 2020 (Update 4 or later)
-- Abaqus/CAE 2021 (full version)
+- Abaqus 2021 (full version)
 
 ## Installation
 Firstly, you need to install all the dependencies, which have been successfully tested on Windows 10, and then link them. The process is described in [this tutorial](http://dx.doi.org/10.13140/RG.2.2.33539.32800), which uses a similar version. Afterward, download this repository into your system. Given that the address of the root directory of the local repository on your system may differ from the one set in the code, you will need to change it to your local address. You can do this by modifying the values passed to the `os.chdir` function in the Python file and the `FilLoc` variable in the Fortran file. In the latter case, if the length of the new address is changed, you will also need to correct the length defined after `CHARACTER FilLoc` that is the length + 8.
