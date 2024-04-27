@@ -16,7 +16,23 @@ year="2024",
 publisher="Springer Nature Switzerland",
 address="Cham",
 pages="105--112",
-isbn="978-3-031-55315-8"
+isbn="978-3-031-55315-8",
+doi="10.1007/978-3-031-55315-8\_12"
+}
+```
+
+This study is also based on our previous work ([DOI](https://doi.org/10.1016/j.jmbbm.2020.104203)), which can cited as follows:
+
+```
+@article{sajjadinia2021a,
+author="Sajjadinia, Seyed Shayan and Carpentieri, Bruno and Holzapfel, Gerhard A.",
+title="A Backward Pre-stressing Algorithm for Efficient Finite Element Implementation of In Vivo Material and Geometrical Parameters into Fibril-reinforced Mixture Models of Articular Cartilage",
+journal="Journal of the Mechanical Behavior of Biomedical Materials",
+volume="114",
+pages="104203",
+year="2021",
+issn="1751--6161",
+doi="10.1016/j.jmbbm.2020.104203"
 }
 ```
 
