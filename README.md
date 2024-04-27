@@ -21,7 +21,7 @@ doi="10.1007/978-3-031-55315-8\_12"
 }
 ```
 
-This study is also based on our previous work ([DOI](https://doi.org/10.1016/j.jmbbm.2020.104203)), which can cited as follows:
+This study is also indirectly based on our previous work ([DOI](https://doi.org/10.1016/j.jmbbm.2020.104203)), which can cited as follows:
 
 ```
 @article{sajjadinia2021a,
